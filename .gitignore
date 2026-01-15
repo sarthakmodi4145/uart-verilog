@@ -1,0 +1,10 @@
+# Simulation files
+*.vcd
+*.out
+*.log
+
+# Icarus build
+a.out
+
+# macOS junk
+.DS_Store
