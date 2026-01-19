@@ -1,22 +1,32 @@
-module baud_gen(input wire clk, input wire rst,output reg baud_tick);
+module baud_gen(input wire clk, input wire rst,output reg baud_tick1,output reg baud_tick2);
 parameter clk_freq=50_000_000;
 parameter baud=9600;
-localparam integer baud_div=clk_freq/baud ;
-reg [$clog2(baud_div)-1:0] counter;
+localparam integer baud_div1=clk_freq/baud ;
+localparam integer baud_div2=clk_freq/(baud*16) ;
+reg [$clog2(baud_div1)-1:0] counter1;
+reg [$clog2(baud_div2)-1:0] counter2;
 
 always @(posedge clk) begin
     if (rst) begin
-        counter<=0;
-        baud_tick<=1'b0;
-    end
+        counter1<=0;
+        counter2<=0;
+        baud_tick1<=1'b0;
+        baud_tick2<=1'b0;
+    end else begin
+        baud_tick1 <= 1'b0;
+        baud_tick2 <= 1'b0;
 
-    else if (counter==baud_div-1)begin
-        counter<=0;
-        baud_tick<=1'b1;
-    end
-    else begin
-        counter<=counter+1;
-        baud_tick=1'b0;
+        if (counter1 == baud_div1-1) begin
+            counter1   <= 0;
+            baud_tick1 <= 1'b1;
+        end else
+            counter1 <= counter1 + 1;
+
+        if (counter2 == baud_div2-1) begin
+            counter2   <= 0;
+            baud_tick2 <= 1'b1;
+        end else
+            counter2 <= counter2 + 1;
     end
 end
 endmodule

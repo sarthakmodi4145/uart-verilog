@@ -1,4 +1,4 @@
-module transmitter(input wire clk,input wire wr_en,input wire baud_tick,input wire rst,  input wire [7:0] data_in,output reg tx,output reg busy);
+module transmitter(input wire clk,input wire wr_en,input wire baud_tick1,input wire rst,  input wire [7:0] data_in,output reg tx,output reg busy);
 localparam idle=2'b00,start=2'b01,data=2'b10,stop=2'b11;
 reg [1:0] state;
 reg [2:0] bit_inx;
@@ -10,7 +10,7 @@ always @(posedge clk) begin
         busy<=1'b0;
         tx<=1'b1;
         bit_inx<=3'd0;
-        shift_reg<=7'b0;
+        shift_reg<=8'b0;
     end
     else begin
         case(state)
@@ -26,14 +26,14 @@ always @(posedge clk) begin
         end
 
         start: begin
-            if(baud_tick) begin
+            if(baud_tick1) begin
                 tx<=1'b0;
                 state<=data;
             end
         end
 
         data: begin
-            if(baud_tick) begin
+            if(baud_tick1) begin
                 tx<=shift_reg[bit_inx];
                 bit_inx<=bit_inx+1;
 
@@ -42,8 +42,9 @@ always @(posedge clk) begin
             end
         end
         stop:begin
-            if(baud_tick==1'b1) begin
+            if(baud_tick1==1'b1) begin
                 tx<=1'b1;
+                busy <= 1'b0;
                 state<=idle;
             end
         end
