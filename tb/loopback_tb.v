@@ -8,48 +8,34 @@ module loopback_tb;
     wire [7:0] rx_data;
     wire rdy;
     reg rdy_clr;
-    wire baud_tick1;
-    wire baud_tick2;
-    
-    // Clock generation: 50 MHz
-    always #10 clk = ~clk;  // 20ns period = 50MHz
-    
-    // Baud Generator
-    baud_gen #(
-        .clk_freq(50_000_000),  // 50 MHz
-        .baud(9600)
-    ) baud_inst (
-        .clk(clk),
-        .rst(rst),
-        .baud_tick1(baud_tick1),
-        .baud_tick2(baud_tick2)
-    );
-    
-    // UART Transmitter
-    transmitter tx_inst (
-        .clk(clk),
-        .rst(rst),
-        .baud_tick1(baud_tick1),
-        .wr_en(wr_en),
-        .data_in(tx_data),
-        .tx(tx_line),
-        .busy(tx_busy)
-    );
-    
-    // UART Receiver (loopback)
-    receiver rx_inst (
-        .clk(clk),
-        .rst(rst),
-        .baud_tick2(baud_tick2),
-        .rx(tx_line),
-        .rdy_clr(rdy_clr),
-        .data_out(rx_data),
-        .rdy(rdy)
-    );
     
     // Test data array
     reg [7:0] test_data [0:4];
     integer i;
+    
+    // Clock generation: 50 MHz
+    always #10 clk = ~clk;  // 20ns period = 50MHz
+    
+    // ===================================
+    // UART Top Module Instance (Loopback)
+    // ===================================
+    uart_top #(
+        .CLK_FREQ(50_000_000),
+        .BAUD_RATE(9600)
+    ) uart_system (
+        .clk(clk),
+        .rst(rst),
+        // Transmitter interface
+        .tx_data_in(tx_data),
+        .tx_wr_en(wr_en),
+        .tx_out(tx_line),
+        .tx_busy_out(tx_busy),
+        // Receiver interface (loopback: connect TX to RX)
+        .rx_in(tx_line),
+        .rx_rdy_clr(rdy_clr),
+        .rx_data_out(rx_data),
+        .rx_rdy_out(rdy)
+    );
     
     initial begin
         $dumpfile("uart.vcd");
@@ -76,6 +62,7 @@ module loopback_tb;
         
         $display("========================================");
         $display("UART Multiple Byte Test Started");
+        $display("Clock: %0d Hz, Baud: 9600", 50_000_000);
         $display("========================================\n");
         
         // Send multiple bytes
