@@ -1,4 +1,7 @@
-module transmitter(
+module transmitter #(
+    parameter PARITY_EN = 1,      // 1 = Enable parity, 0 = Disable
+    parameter PARITY_TYPE = 0     // 0 = Even parity, 1 = Odd parity
+)(
     input wire clk,
     input wire wr_en,
     input wire baud_tick1,
@@ -7,14 +10,24 @@ module transmitter(
     output reg tx,
     output reg busy
 );
-    localparam idle  = 2'b00;
-    localparam start = 2'b01;
-    localparam data  = 2'b10;
-    localparam stop  = 2'b11;
+    localparam idle   = 3'b000;
+    localparam start  = 3'b001;
+    localparam data   = 3'b010;
+    localparam parity = 3'b011;
+    localparam stop   = 3'b100;
     
-    reg [1:0] state;
+    reg [2:0] state;
     reg [2:0] bit_inx;
     reg [7:0] shift_reg;
+    reg parity_bit;
+
+    
+    always @(*) begin
+        if (PARITY_TYPE == 0)  
+            parity_bit = ^shift_reg;  
+        else                   
+            parity_bit = ~(^shift_reg);
+    end
 
     always @(posedge clk) begin 
         if (rst) begin 
@@ -48,10 +61,20 @@ module transmitter(
                     if (baud_tick1) begin
                         tx <= shift_reg[bit_inx];
                         
-                        if (bit_inx == 3'd7)
-                            state <= stop;
-                        else
+                        if (bit_inx == 3'd7) begin
+                            if (PARITY_EN)
+                                state <= parity;
+                            else
+                                state <= stop;
+                        end else
                             bit_inx <= bit_inx + 1;
+                    end
+                end
+                
+                parity: begin
+                    if (baud_tick1) begin
+                        tx <= parity_bit;
+                        state <= stop;
                     end
                 end
                 
@@ -62,6 +85,8 @@ module transmitter(
                         state <= idle;
                     end
                 end
+                
+                default: state <= idle;
             endcase
         end
     end

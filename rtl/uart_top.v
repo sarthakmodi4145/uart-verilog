@@ -1,6 +1,8 @@
 module uart_top #(
-    parameter CLK_FREQ = 50_000_000,  // 50 MHz default
-    parameter BAUD_RATE = 9600         // 9600 baud default
+    parameter CLK_FREQ = 50_000_000,  
+    parameter BAUD_RATE = 9600,       
+    parameter PARITY_EN = 1,          
+    parameter PARITY_TYPE = 0         
 )(
     input  wire clk,
     input  wire rst,
@@ -11,20 +13,21 @@ module uart_top #(
     output wire tx_out,
     output wire tx_busy_out,
     
-    // Receiver interface
+    
     input  wire rx_in,
     input  wire rx_rdy_clr,
     output wire [7:0] rx_data_out,
-    output wire rx_rdy_out
+    output wire rx_rdy_out,
+    output wire rx_parity_error
 );
 
-    // Internal baud tick signals
-    wire baud_tick1;    // For transmitter
-    wire baud_tick2;    // For receiver (16x oversampling)
     
-    // ===================================
+    wire baud_tick1;
+    wire baud_tick2;
+    
+    
     // Baud Rate Generator Instance
-    // ===================================
+   
     baud_gen #(
         .clk_freq(CLK_FREQ),
         .baud(BAUD_RATE)
@@ -35,10 +38,13 @@ module uart_top #(
         .baud_tick2(baud_tick2)
     );
     
-    // ===================================
+   
     // UART Transmitter Instance
-    // ===================================
-    transmitter uart_transmitter (
+    
+    transmitter #(
+        .PARITY_EN(PARITY_EN),
+        .PARITY_TYPE(PARITY_TYPE)
+    ) uart_transmitter (
         .clk(clk),
         .rst(rst),
         .baud_tick1(baud_tick1),
@@ -48,17 +54,21 @@ module uart_top #(
         .busy(tx_busy_out)
     );
     
-    // ===================================
+    
     // UART Receiver Instance
-    // ===================================
-    receiver uart_receiver (
+    
+    receiver #(
+        .PARITY_EN(PARITY_EN),
+        .PARITY_TYPE(PARITY_TYPE)
+    ) uart_receiver (
         .clk(clk),
         .rst(rst),
         .baud_tick2(baud_tick2),
         .rx(rx_in),
         .rdy_clr(rx_rdy_clr),
         .data_out(rx_data_out),
-        .rdy(rx_rdy_out)
+        .rdy(rx_rdy_out),
+        .parity_error(rx_parity_error)
     );
 
 endmodule
