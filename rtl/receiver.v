@@ -1,6 +1,7 @@
 module receiver #(
-    parameter PARITY_EN = 1,      // 1 = Enable parity, 0 = Disable
-    parameter PARITY_TYPE = 0     // 0 = Even parity, 1 = Odd parity
+    parameter PARITY_EN   = 1,      // 1 = Enable parity
+    parameter PARITY_TYPE = 0,      // 0 = Even, 1 = Odd
+    parameter XOR_KEY     = 8'h45   // 🔓 XOR KEY
 )(
     input  wire clk,
     input  wire rst,
@@ -25,111 +26,80 @@ module receiver #(
     reg received_parity;
     reg calculated_parity;
 
-    
+    // Parity calculated on ENCRYPTED data
     always @(*) begin
-        if (PARITY_TYPE == 0)  
-            calculated_parity = ^shift_reg;
-        else                    
-            calculated_parity = ~(^shift_reg);
+        if (PARITY_TYPE == 0)
+            calculated_parity = ^shift_reg;      // Even
+        else
+            calculated_parity = ~(^shift_reg);   // Odd
     end
 
     always @(posedge clk) begin
         if (rst) begin
             state          <= IDLE;
-            sample_cnt     <= 4'd0;
-            bit_idx        <= 3'd0;
-            shift_reg      <= 8'd0;
-            data_out       <= 8'd0;
-            rdy            <= 1'b0;
-            parity_error   <= 1'b0;
-            received_parity <= 1'b0;
+            sample_cnt     <= 0;
+            bit_idx        <= 0;
+            shift_reg      <= 0;
+            data_out       <= 0;
+            rdy            <= 0;
+            parity_error   <= 0;
+            received_parity <= 0;
         end else begin
-            
             if (rdy_clr) begin
-                rdy <= 1'b0;
-                parity_error <= 1'b0;
+                rdy          <= 0;
+                parity_error <= 0;
             end
 
             if (baud_tick2) begin
                 case (state)
-
-                    
-                    IDLE: begin
-                        if (rx == 1'b0) begin  
-                            state      <= START;
-                            sample_cnt <= 4'd0;
-                            parity_error <= 1'b0;
-                        end
+                    IDLE: if (!rx) begin
+                        state <= START;
+                        sample_cnt <= 0;
                     end
 
-                    
-                    START: begin
-                        if (sample_cnt == 4'd7) begin
-                            
-                            if (rx == 1'b0) begin
-                                state      <= DATA;
-                                sample_cnt <= 4'd0;
-                                bit_idx    <= 3'd0;
-                            end else begin
-                                state <= IDLE;
-                            end
-                        end else begin
-                            sample_cnt <= sample_cnt + 1;
-                        end
-                    end
+                    START: if (sample_cnt == 7) begin
+                        if (!rx) begin
+                            state <= DATA;
+                            bit_idx <= 0;
+                            sample_cnt <= 0;
+                        end else
+                            state <= IDLE;
+                    end else
+                        sample_cnt <= sample_cnt + 1;
 
-                   
-                    DATA: begin
-                        if (sample_cnt == 4'd15) begin
-                            shift_reg[bit_idx] <= rx;
-                            sample_cnt <= 4'd0;
-                            
-                            if (bit_idx == 3'd7) begin
-                                if (PARITY_EN)
-                                    state <= PARITY;
-                                else
-                                    state <= STOP;
-                            end else
-                                bit_idx <= bit_idx + 1;
-                        end else begin
-                            sample_cnt <= sample_cnt + 1;
-                        end
-                    end
+                    DATA: if (sample_cnt == 15) begin
+                        shift_reg[bit_idx] <= rx;
+                        sample_cnt <= 0;
+                        if (bit_idx == 7) begin
+                            if (PARITY_EN)
+                                state <= PARITY;
+                            else
+                                state <= STOP;
+                        end else
+                            bit_idx <= bit_idx + 1;
+                    end else
+                        sample_cnt <= sample_cnt + 1;
 
-                    
-                    PARITY: begin
-                        if (sample_cnt == 4'd15) begin
-                            received_parity <= rx;
-                            sample_cnt <= 4'd0;
-                            state <= STOP;
-                            
-                           
-                            if (received_parity != calculated_parity) begin
-                                parity_error <= 1'b1;
-                                $display("PARITY ERROR @ %t: Expected %b, Got %b", 
-                                         $time, calculated_parity, received_parity);
-                            end
-                        end else begin
-                            sample_cnt <= sample_cnt + 1;
-                        end
-                    end
+                    PARITY: if (sample_cnt == 15) begin
+                        received_parity <= rx;
+                        if (rx != calculated_parity)
+                            parity_error <= 1'b1;
+                        sample_cnt <= 0;
+                        state <= STOP;
+                    end else
+                        sample_cnt <= sample_cnt + 1;
 
-                   
-                    STOP: begin
-                        if (sample_cnt == 4'd15) begin
-                            if (rx == 1'b1) begin
-                                data_out <= shift_reg;
-                                rdy      <= 1'b1;
-                                $display("RX DONE @ %t, data = %h, parity_error = %b", 
-                                         $time, shift_reg, parity_error);
-                            end
-                            state      <= IDLE;
-                            sample_cnt <= 4'd0;
-                        end else begin
-                            sample_cnt <= sample_cnt + 1;
+                    STOP: if (sample_cnt == 15) begin
+                        if (rx) begin
+                            // 🔓 XOR DECRYPTION
+                            data_out <= shift_reg ^ XOR_KEY;
+                            rdy <= 1'b1;
                         end
-                    end
-                    
+                        state <= IDLE;
+                        sample_cnt <= 0;
+                    end else
+                        sample_cnt <= sample_cnt + 1;
+
                     default: state <= IDLE;
                 endcase
             end
