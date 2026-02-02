@@ -1,4 +1,0 @@
-git status
-git add rtl/tx.v tb/tx_tb.v
-git commit -m "Added UART transmitter FSM"
-git push
