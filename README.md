@@ -71,7 +71,7 @@ The design is verified using a Verilog testbench and simulated with **Icarus Ver
 - No data corruption under normal conditions  
 
 ### 📷 Simulation Waveform
-![UART Waveform](waveform/waveform.jpeg)
+![UART Waveform](waveforms/waveform.jpeg)
 
 ---
 
